@@ -28,7 +28,7 @@ jobs:
     
     - name: Run tests
       run: |
-        python -m unittest discover tests -v
+        python -m unittest discover tests -p "*tests.py" -v
     
     - name: Lint with built-in tools
       run: |

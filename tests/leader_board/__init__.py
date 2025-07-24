@@ -1,0 +1,1 @@
+# Leader board tests package initialization
