@@ -1,0 +1,119 @@
+name: Build Release Artifacts
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for the release'
+        required: true
+        default: 'latest'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Run tests
+      run: |
+        python -m unittest discover tests -v
+    
+    - name: Build executable (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        pyinstaller --onefile --add-data "configuration:configuration" --add-data "resources:resources" --name "space-raid-${{ runner.os }}" __init__.py
+    
+    - name: Build executable (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        pyinstaller --onefile --add-data "configuration;configuration" --add-data "resources;resources" --name "space-raid-Windows" __init__.py
+    
+    - name: Create portable package (Linux/macOS)
+      if: runner.os != 'Windows'
+      run: |
+        mkdir -p space-raid-portable-${{ runner.os }}
+        cp -r configuration space-raid-portable-${{ runner.os }}/
+        cp -r resources space-raid-portable-${{ runner.os }}/
+        cp -r objects space-raid-portable-${{ runner.os }}/
+        cp -r other space-raid-portable-${{ runner.os }}/
+        cp __init__.py space-raid-portable-${{ runner.os }}/
+        cp requirements.txt space-raid-portable-${{ runner.os }}/
+        cp README.md space-raid-portable-${{ runner.os }}/
+        cp LICENSE space-raid-portable-${{ runner.os }}/
+        echo "#!/bin/bash" > space-raid-portable-${{ runner.os }}/run.sh
+        echo "python3 __init__.py" >> space-raid-portable-${{ runner.os }}/run.sh
+        chmod +x space-raid-portable-${{ runner.os }}/run.sh
+        tar -czf space-raid-portable-${{ runner.os }}.tar.gz space-raid-portable-${{ runner.os }}/
+    
+    - name: Create portable package (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        mkdir space-raid-portable-Windows
+        xcopy configuration space-raid-portable-Windows\configuration\ /E /I
+        xcopy resources space-raid-portable-Windows\resources\ /E /I
+        xcopy objects space-raid-portable-Windows\objects\ /E /I
+        xcopy other space-raid-portable-Windows\other\ /E /I
+        copy __init__.py space-raid-portable-Windows\
+        copy requirements.txt space-raid-portable-Windows\
+        copy README.md space-raid-portable-Windows\
+        copy LICENSE space-raid-portable-Windows\
+        echo python __init__.py > space-raid-portable-Windows\run.bat
+        powershell Compress-Archive -Path space-raid-portable-Windows -DestinationPath space-raid-portable-Windows.zip
+    
+    - name: Upload executable artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: space-raid-executable-${{ runner.os }}
+        path: |
+          dist/space-raid-*
+    
+    - name: Upload portable artifacts (Linux/macOS)
+      if: runner.os != 'Windows'
+      uses: actions/upload-artifact@v3
+      with:
+        name: space-raid-portable-${{ runner.os }}
+        path: space-raid-portable-${{ runner.os }}.tar.gz
+    
+    - name: Upload portable artifacts (Windows)
+      if: runner.os == 'Windows'
+      uses: actions/upload-artifact@v3
+      with:
+        name: space-raid-portable-Windows
+        path: space-raid-portable-Windows.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/v')
+      with:
+        files: |
+          space-raid-*/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -34,7 +34,7 @@ class LeaderBoardServiceTests(unittest.TestCase):
         service.add_entry(self.examplary_data_record)
 
         # in memory we have 3 entries
-        self.assertEquals(len(service.leader_board), 3)
+        self.assertEqual(len(service.leader_board), 3)
 
         # but file should be empty:
         self.assertTrue(os.stat(self.test_file).st_size == 0)
@@ -47,25 +47,25 @@ class LeaderBoardServiceTests(unittest.TestCase):
             with open(self.test_file, 'r') as output_file:
                 expected_content = expected_file.read()
                 output_content = output_file.read()
-                self.assertEquals(expected_content, output_content)
+                self.assertEqual(expected_content, output_content)
 
         # create new service to see if entries were persisted
         service = LeaderBoardService(self.test_file)
         service.load_leader_board()
 
-        self.assertEquals(len(service.leader_board), 3)
+        self.assertEqual(len(service.leader_board), 3)
 
     def test_entries_read_happy_path(self):
         service = LeaderBoardService(self.expected_file)
         service.load_leader_board()
 
         for entry in service.leader_board:
-            self.assertEquals(self.examplary_data_record.row, entry.row)
+            self.assertEqual(self.examplary_data_record.row, entry.row)
 
     def test_file_not_found_empty_list_returned(self):
         service = LeaderBoardService(self.expected_file + 'non existing')
         service.load_leader_board()
-        self.assertEquals([], service.leader_board)
+        self.assertEqual([], service.leader_board)
 
 
 if __name__ == '__main__':
